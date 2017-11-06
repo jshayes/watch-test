@@ -1,0 +1,128 @@
+#!/usr/bin/env php
+<?php
+
+function getTestingDirectories(string $dir)
+{
+    return array_filter(
+        array_map(
+            function ($directory) use ($dir) {
+                return "$dir/tests/$directory";
+            },
+            array_diff(scandir($dir . '/tests'), ['.', '..'])
+        ),
+        function ($directory) {
+            return is_dir($directory);
+        }
+    );
+}
+
+function getTestName(string $test)
+{
+    $matches = [];
+    if (preg_match('/^.*\/tests\/(.*?)\/.*\Test.php$/', $test, $matches)) {
+        return $matches[1];
+    }
+    return '';
+}
+
+function printLabel(string $label, string $colour)
+{
+    $label = "   $label   ";
+    if (strlen($label) < 80) {
+        $padding = str_repeat(' ', floor((80 - strlen($label)) / 2));
+        $label = "$padding$label$padding";
+
+        $label .= str_repeat(' ', strlen($label) % 2);
+    }
+
+    $blankLine = str_repeat(' ', strlen($label));
+
+    echo "$colour$blankLine\033[0m\n";
+    echo "$colour$label\033[0m\n";
+    echo "$colour$blankLine\033[0m\n";
+}
+
+function printTestLabel(string $test)
+{
+    $testName = getTestName($test);
+
+    printLabel("Running $testName tests", "\033[30;106m");
+    echo "\nRunning $test\n";
+}
+
+function printTestResult(string $test, int $result)
+{
+    echo "\n";
+
+    $testName = getTestName($test);
+    if ($result == 0) {
+        printLabel("$testName tests passed!", "\033[30;42m");
+    } else {
+        printLabel("$testName tests failed!", "\033[30;41m");
+    }
+}
+
+$file = $argv[1];
+$testsToRun = [];
+
+$matches = [];
+if (preg_match('/^(.*)\/tests\/.*?\/(.*\Test.php)$/', $file, $matches)) {
+    $testsToRun[] = $file;
+
+    $rootDir = $matches[1];
+    $test = $matches[2];
+
+    $testName = substr($file, strrpos($file, '/') + 1);
+    $fileName = str_replace('Test.php', '.php', $testName);
+
+    $file = $rootDir . '/app/' . str_replace($testName, $fileName, $test);
+}
+
+if (preg_match('/^(.*)\/app\/(.*\.php)$/', $file, $matches)) {
+    $rootDir = $matches[1];
+    $file = $matches[2];
+
+    $fileName = substr($file, strrpos($file, '/') + 1);
+    $testName = str_replace('.php', 'Test.php', $fileName);
+
+    $test = str_replace($fileName, $testName, $file);
+
+    $files = array_filter(
+        array_map(
+            function ($directory) use ($test) {
+                return "$directory/$test";
+            },
+            getTestingDirectories($rootDir)
+        ),
+        function ($file) {
+            return is_file($file);
+        }
+    );
+
+    $testsToRun = array_unique(array_merge($testsToRun, $files));
+
+    if (empty($testsToRun)) {
+        system('clear');
+        echo "\033[1;31mNo tests found!\033[0m\n\n";
+        return;
+    }
+}
+
+if (empty($testsToRun)) {
+    return;
+}
+
+$phpunit = "$rootDir/vendor/bin/phpunit";
+
+if (!is_file($phpunit)) {
+    $phpunit = 'phpunit';
+}
+
+system('clear');
+foreach ($testsToRun as $test) {
+    printTestLabel($test);
+    $result;
+    system("$phpunit --color=always $test", $result);
+    printTestResult($test, $result);
+    echo "\n";
+}
