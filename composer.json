@@ -1,0 +1,13 @@
+{
+    "name": "jshayes/test-runner",
+    "type": "project",
+    "require": {
+        "symfony/process": "^3.3"
+    },
+    "authors": [
+        {
+            "name": "Justin Hayes",
+            "email": "justin@soapboxhq.com"
+        }
+    ]
+}

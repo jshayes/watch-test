@@ -1,6 +1,10 @@
 #!/usr/bin/env php
 <?php
 
+use Symfony\Component\Process\Process;
+
+require __DIR__ . '/vendor/autoload.php';
+
 function getTestingDirectories(string $dir)
 {
     return array_filter(
@@ -47,7 +51,6 @@ function printTestLabel(string $test)
     $testName = getTestName($test);
 
     printLabel("Running $testName tests", "\033[30;106m");
-    echo "\nRunning $test\n";
 }
 
 function printTestResult(string $test, int $result)
@@ -75,10 +78,11 @@ if (preg_match('/^(.*)\/tests\/.*?\/(.*\Test.php)$/', $file, $matches)) {
     $testName = substr($file, strrpos($file, '/') + 1);
     $fileName = str_replace('Test.php', '.php', $testName);
 
-    $file = $rootDir . '/app/' . str_replace($testName, $fileName, $test);
+    $appDir = is_dir("$rootDir/app") ? 'app' : 'src';
+    $file = "$rootDir/$appDir/" . str_replace($testName, $fileName, $test);
 }
 
-if (preg_match('/^(.*)\/app\/(.*\.php)$/', $file, $matches)) {
+if (preg_match('/^(.*)\/(?:(?:app)|(?:src))\/(.*\.php)$/', $file, $matches)) {
     $rootDir = $matches[1];
     $file = $matches[2];
 
@@ -121,8 +125,14 @@ if (!is_file($phpunit)) {
 system('clear');
 foreach ($testsToRun as $test) {
     printTestLabel($test);
-    $result;
-    system("$phpunit --color=always $test", $result);
-    printTestResult($test, $result);
+    echo "\nUsing: $phpunit\n";
+    echo "Running: $test\n";
+
+    $process = new Process("$phpunit --color=always $test");
+    $process->run(function ($type, $buffer) {
+        echo $buffer;
+    });
+
+    printTestResult($test, $process->getExitCode());
     echo "\n";
 }
